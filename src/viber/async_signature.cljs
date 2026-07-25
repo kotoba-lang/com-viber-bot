@@ -1,39 +1,20 @@
 (ns viber.async-signature
-  "Cloudflare Workers / browser counterpart to `viber.signature` — see that
-  ns's docstring for the bot-token-as-HMAC-key scheme this verifies, and
-  `line-messaging.async-signature` for why this is a plain `.cljs`
-  namespace (Web Crypto's `SubtleCrypto.sign` is Promise-based).
+  "Promise-returning shim over `viber.signature`, kept for callers that already
+  `await` this API (cloud-manimani's Viber Worker).
 
-  `raw-body` MUST be the exact bytes Viber sent (pre-JSON-parse) — on a
-  Cloudflare Worker that means reading `request.text()` BEFORE any
-  `request.json()` call (a Request body stream can only be consumed
-  once)."
-  )
-
-(defn- ->key [bot-token]
-  (.importKey js/crypto.subtle
-              "raw"
-              (.encode (js/TextEncoder.) bot-token)
-              #js {:name "HMAC" :hash "SHA-256"}
-              false
-              #js ["sign"]))
-
-(defn- bytes->hex [^js buf]
-  (let [arr (js/Uint8Array. buf)]
-    (apply str (map (fn [b] (let [h (.toString b 16)]
-                              (if (= 1 (.-length h)) (str "0" h) h)))
-                     (array-seq arr)))))
+  It used to be a second implementation of the same HMAC, written because
+  `SubtleCrypto.sign` is Promise-based. The signature now comes from
+  `kotoba.bytes.sha256`, which is synchronous on both runtimes, so there is
+  nothing left here but the Promise wrapper. New code should call
+  `viber.signature` directly."
+  (:require [viber.signature :as sig]))
 
 (defn hmac-sha256-hex
-  "hex(HMAC-SHA256(bot-token, raw-body)) -- returns a `js/Promise<string>`."
+  "→ `js/Promise<string>`. See `viber.signature/hmac-sha256-hex`."
   [bot-token raw-body]
-  (-> (->key bot-token)
-      (.then (fn [key] (.sign js/crypto.subtle "HMAC" key (.encode (js/TextEncoder.) raw-body))))
-      (.then bytes->hex)))
+  (js/Promise.resolve (sig/hmac-sha256-hex bot-token raw-body)))
 
 (defn valid-signature?
-  "Same contract as `viber.signature/valid-signature?`, async: returns a
-  `js/Promise<boolean>`."
+  "→ `js/Promise<boolean>`. See `viber.signature/valid-signature?`."
   [bot-token raw-body x-viber-content-signature]
-  (-> (hmac-sha256-hex bot-token raw-body)
-      (.then (fn [hex] (= hex (str x-viber-content-signature))))))
+  (js/Promise.resolve (sig/valid-signature? bot-token raw-body x-viber-content-signature)))

@@ -14,33 +14,26 @@
   doesn't exist, `:creds {:bot-token}` is the only credential this whole
   library needs. The raw body bytes (pre-JSON-parse) are required for
   verification, same as every other webhook signature in this workspace."
-  #?(:clj (:import [javax.crypto Mac]
-                    [javax.crypto.spec SecretKeySpec])))
+  (:require [kotoba.bytes :as b]
+            [kotoba.bytes.sha256 :as sha]))
 
-#?(:clj
-   (defn- bytes->hex [bs]
-     (apply str (map (fn [b]
-                        (let [h (Integer/toHexString (bit-and (int b) 0xff))]
-                          (if (= 1 (count h)) (str "0" h) h)))
-                      bs))))
+(defn hmac-sha256-hex
+  "hex(HMAC-SHA256(bot-token, raw-body)) — the exact value Viber puts in
+  `X-Viber-Content-Signature` (no `sha256=` prefix, unlike Meta's scheme).
+  `raw-body` is the request body as a UTF-8 String."
+  [bot-token raw-body]
+  (sha/hmac-sha256-hex (str bot-token) (str raw-body)))
 
-#?(:clj
-   (defn hmac-sha256-hex
-     "hex(HMAC-SHA256(bot-token, raw-body)) -- the exact value Viber puts
-     in `X-Viber-Content-Signature` (no `sha256=` prefix, unlike Meta's
-     scheme). `raw-body` is the request body as a String (UTF-8)."
-     [bot-token raw-body]
-     (let [mac (Mac/getInstance "HmacSHA256")]
-       (.init mac (SecretKeySpec. (.getBytes (str bot-token) "UTF-8") "HmacSHA256"))
-       (bytes->hex (.doFinal mac (.getBytes (str raw-body) "UTF-8"))))))
+(defn valid-signature?
+  "`bot-token` (the same token used for `send_message!` / `set-webhook!` — see
+  the ns docstring, this is NOT a separate app secret) + the raw webhook
+  request body + the `X-Viber-Content-Signature` header value — true iff they
+  match.
 
-#?(:clj
-   (defn valid-signature?
-     "`bot-token` (same token used for `send_message!`/`set-webhook!` --
-     see ns docstring, this is NOT a separate app secret) + the raw webhook
-     request body + the `X-Viber-Content-Signature` header value -- true
-     iff they match. Plain equality, not constant-time (same posture/
-     rationale as `line-messaging.signature/valid-signature?`'s
-     docstring)."
-     [bot-token raw-body x-viber-content-signature]
-     (= (hmac-sha256-hex bot-token raw-body) (str x-viber-content-signature))))
+  Compared in constant time. The previous plain `=` returned as soon as two
+  characters differed, and this endpoint answers whoever asks, as often as
+  they ask — the shape of leak that lets a signature be recovered a byte at a
+  time."
+  [bot-token raw-body x-viber-content-signature]
+  (b/constant-time-eq (hmac-sha256-hex bot-token raw-body)
+                      (str x-viber-content-signature)))

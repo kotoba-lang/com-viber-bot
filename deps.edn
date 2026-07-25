@@ -1,5 +1,5 @@
 {:paths ["src"]
- :deps {}
+ :deps {io.github.kotoba-lang/bytes {:git/sha "5f977dd3e8ca73185488302841ade390e1979540"}}
  :aliases
  {:test {:extra-paths ["test"]
          :extra-deps {io.github.cognitect-labs/test-runner
