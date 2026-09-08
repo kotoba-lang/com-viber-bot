@@ -1,6 +1,6 @@
 (ns viber.client-test
   (:require [clojure.test :refer [deftest is]]
-            [clojure.string :as str]
+            [kotoba.lang.text :as str]
             [viber.client :as v]))
 
 (defn- fake-io [status body]
