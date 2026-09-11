@@ -54,10 +54,10 @@ Worker route handles inbound.
 ## Testing
 
 ```bash
-clojure -M:test   # signature.cljc + events.cljc + client.cljc (JVM)
-clojure -M:lint
+kbb -M:test   # signature.cljc + events.cljc + client.cljc (JVM)
+kbb -M:lint
 ```
 
 `async-signature.cljs` has no JVM-runnable test here (Web Crypto isn't
-available under `clojure -M`); same posture as `line-messaging`'s and
+available under `kbb -M`); same posture as `line-messaging`'s and
 `meta-webhook`'s async surfaces.
